@@ -1,0 +1,50 @@
+/* Desktop-style application CSS */
+
+/* Drag region for custom titlebar */
+[data-tauri-drag-region] {
+   -webkit-app-region: drag;
+   app-region: drag;
+}
+
+/* Make buttons clickable inside drag region */
+[data-tauri-drag-region] button {
+   -webkit-app-region: no-drag;
+   app-region: no-drag;
+}
+
+/* Disable text selection on UI elements for native feel */
+.no-select {
+   user-select: none;
+   -webkit-user-select: none;
+}
+
+/* Custom scrollbar - thin and subtle */
+::-webkit-scrollbar {
+   width: 8px;
+   height: 8px;
+}
+
+::-webkit-scrollbar-track {
+   background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+   background: oklch(0.7 0.01 270);
+   border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+   background: oklch(0.6 0.01 270);
+}
+
+/* Remove outline on focused elements for cleaner look */
+*:focus {
+   outline: none;
+}
+
+/* Smooth but quick transitions */
+* {
+   transition-property: background-color, border-color, color;
+   transition-duration: 100ms;
+   transition-timing-function: ease-out;
+}
