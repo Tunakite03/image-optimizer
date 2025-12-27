@@ -7,7 +7,6 @@ import { ProgressPanel } from '@/components/ProgressPanel';
 import { TrackedFile, OutputFormat, OperationMode, BatchResult } from '@/types';
 import './App.css';
 import { config } from './config';
-import { GithubIcon } from 'lucide-react';
 
 function App() {
    // File state

@@ -1,5 +1,5 @@
 import { open } from '@tauri-apps/plugin-dialog';
-import { FolderOpen, Shield } from 'lucide-react';
+import { FolderOpen } from 'lucide-react';
 import { OutputFormat, FORMAT_OPTIONS, OperationMode, OPERATION_MODE_OPTIONS } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
