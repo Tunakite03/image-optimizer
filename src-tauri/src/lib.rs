@@ -6,15 +6,15 @@ use std::fs;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OperationMode {
     #[serde(rename = "optimize")]
-    Optimize, // Chỉ nén ảnh (với quality)
+    Optimize, // Only compress (with quality)
     #[serde(rename = "resize")]
-    Resize, // Chỉ thay đổi kích thước
+    Resize, // Only resize
     #[serde(rename = "convert")]
-    Convert, // Chỉ chuyển đổi format (lossless)
+    Convert, // Only convert format (lossless)
     #[serde(rename = "optimize_resize")]
-    OptimizeResize, // Nén + Resize
+    OptimizeResize, // Optimize + Resize
     #[serde(rename = "all")]
-    All, // Làm tất cả: Convert + Optimize + Resize
+    All, // Do all: Convert + Optimize + Resize
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,11 +71,11 @@ pub struct OptimizeBatchRequest {
     pub output_dir: String,
     pub format: Option<OutputFormat>, // Only for 'convert' mode, otherwise use original format
     pub overwrite: bool,
-    pub operation_mode: OperationMode, // Chế độ hoạt động
-    pub quality: Option<f32>, // 0.0 - 100.0, default 75 cho WebP, 80 cho JPEG
+    pub operation_mode: OperationMode, // Operation mode
+    pub quality: Option<f32>, // 0.0 - 100.0, default 75 for WebP, 80 for JPEG
     pub max_width: Option<u32>, // Optional resize width
     pub max_height: Option<u32>, // Optional resize height
-    pub keep_aspect_ratio: Option<bool>, // Giữ tỷ lệ khi resize, default true
+    pub keep_aspect_ratio: Option<bool>, // Keep aspect ratio when resizing, default true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,10 +140,10 @@ fn convert_image(
             let (width, height) = img.dimensions();
             if width > max_w || height > max_h {
                 if keep_aspect_ratio {
-                    // Resize với giữ tỷ lệ (fit within bounds)
+                    // Resize with aspect ratio (fit within bounds)
                     img = img.resize(max_w, max_h, image::imageops::FilterType::Lanczos3);
                 } else {
-                    // Resize exact (có thể làm méo ảnh)
+                    // Resize exact (may distort image)
                     img = img.resize_exact(max_w, max_h, image::imageops::FilterType::Lanczos3);
                 }
             }
