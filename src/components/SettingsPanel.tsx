@@ -241,13 +241,19 @@ export function SettingsPanel({
                         <SelectValue placeholder='Select resize mode' />
                      </SelectTrigger>
                      <SelectContent>
-                        <SelectItem value='percentage' className='text-xs cursor-pointer'>
+                        <SelectItem
+                           value='percentage'
+                           className='text-xs cursor-pointer'
+                        >
                            <div className='flex flex-col'>
                               <span className='font-semibold'>By Percentage</span>
                               <span className='text-[10px] text-muted-foreground'>Resize to % of original size</span>
                            </div>
                         </SelectItem>
-                        <SelectItem value='dimensions' className='text-xs cursor-pointer'>
+                        <SelectItem
+                           value='dimensions'
+                           className='text-xs cursor-pointer'
+                        >
                            <div className='flex flex-col'>
                               <span className='font-semibold'>Custom Dimensions</span>
                               <span className='text-[10px] text-muted-foreground'>Set specific width/height</span>
@@ -261,9 +267,7 @@ export function SettingsPanel({
                {resizeMode === 'percentage' && (
                   <div className='space-y-1.5'>
                      <div className='flex items-center justify-between'>
-                        <label className='text-xs font-medium text-foreground'>
-                           Resize to: {resizePercentage}%
-                        </label>
+                        <label className='text-xs font-medium text-foreground'>Resize to: {resizePercentage}%</label>
                         <div className='flex gap-1'>
                            <button
                               onClick={() => onResizePercentageChange(75)}
