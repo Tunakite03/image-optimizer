@@ -1,7 +1,7 @@
 [package]
 name = "Optisnap"
 version = "0.1.0"
-description = "A Tauri App"
+description = "A bulk image optimizer application that enables users to bulk optimize images by reducing file sizes, converting between formats like PNG, WebP, TIFF, BMP, and QOI, and applying advanced compression techniques for efficient storage and faster loading.
 authors = ["you"]
 edition = "2021"
 
