@@ -2,7 +2,12 @@ use image::{DynamicImage, ImageFormat, GenericImageView};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::fs;
-use tauri::Emitter;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tauri::{Emitter, State, Manager};
+
+// Global cancellation flag
+pub struct CancellationFlag(Arc<AtomicBool>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OperationMode {
@@ -219,12 +224,7 @@ fn convert_image(
     };
     let output_path = output_dir.join(&output_filename);
 
-    eprintln!("=== CONVERT IMAGE ===");
-    eprintln!("Input: {}", input_path.display());
-    eprintln!("Output: {}", output_path.display());
-    eprintln!("Overwrite: {}", overwrite);
-    eprintln!("Output dir: {}", output_dir.display());
-    eprintln!("Output filename: {}", output_filename);
+
 
     // Ensure output directory exists
     fs::create_dir_all(output_dir)
@@ -464,29 +464,46 @@ pub struct ProgressUpdate {
 }
 
 #[tauri::command]
-fn optimize_batch(request: OptimizeBatchRequest, app: tauri::AppHandle) -> BatchResult {
-    let mut results = Vec::new();
-    let mut success_count = 0;
-    let mut failed_count = 0;
-    let total = request.paths.len();
+async fn optimize_batch(request: OptimizeBatchRequest, app: tauri::AppHandle, cancel_flag: State<'_, CancellationFlag>) -> Result<BatchResult, String> {
+    let cancel_flag = cancel_flag.0.clone();
+    
+    tokio::task::spawn_blocking(move || {
+        let mut results = Vec::new();
+        let mut success_count = 0;
+        let mut failed_count = 0;
+        let total = request.paths.len();
 
-    eprintln!("=== OPTIMIZE BATCH START ===");
-    eprintln!("Total files: {}", total);
-    eprintln!("Overwrite: {}", request.overwrite);
-    eprintln!("Create backup: {:?}", request.create_backup);
-    eprintln!("Output dir: {}", request.output_dir);
 
-    for (index, path_str) in request.paths.iter().enumerate() {
-        let input_path = Path::new(path_str);
-        
-        // Emit progress event before processing
-        let _ = app.emit("progress-update", ProgressUpdate {
-            current: index,
-            total,
-            success_count,
-            failed_count,
-            current_file: Some(path_str.clone()),
-        });
+        for (index, path_str) in request.paths.iter().enumerate() {
+            // Check if cancellation was requested
+            if cancel_flag.load(Ordering::Relaxed) {
+                // Mark remaining files as failed with cancellation message
+                for remaining_path in request.paths.iter().skip(index) {
+                    results.push(FileResult {
+                        path: remaining_path.clone(),
+                        status: FileStatus::Failed,
+                        output_path: None,
+                        output_size: None,
+                        output_width: None,
+                        output_height: None,
+                        error: Some("Processing cancelled by user".to_string()),
+                        backup_info: None,
+                    });
+                    failed_count += 1;
+                }
+                break;
+            }
+
+            let input_path = Path::new(path_str);
+            
+            // Emit progress event before processing
+            let _ = app.emit("progress-update", ProgressUpdate {
+                current: index,
+                total,
+                success_count,
+                failed_count,
+                current_file: Some(path_str.clone()),
+            });
         
         // No backup needed
         
@@ -555,6 +572,9 @@ fn optimize_batch(request: OptimizeBatchRequest, app: tauri::AppHandle) -> Batch
         failed_count,
         backups: Vec::new(),
     }
+    })
+    .await
+    .map_err(|e| format!("Failed to execute batch processing: {}", e))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -629,10 +649,7 @@ fn scan_folder_for_images(folder_path: String) -> Result<Vec<String>, String> {
 #[tauri::command]
 fn create_backup(file_path: String) -> Result<BackupInfo, String> {
     let original = Path::new(&file_path);
-    
-    eprintln!("=== CREATE BACKUP START ===");
-    eprintln!("Original file path: {}", file_path);
-    eprintln!("File exists: {}", original.exists());
+
     
     if !original.exists() {
         return Err(format!("File does not exist: {}", file_path));
@@ -642,12 +659,10 @@ fn create_backup(file_path: String) -> Result<BackupInfo, String> {
     let parent = original.parent().ok_or("Cannot get parent directory")?;
     let backup_dir = parent.join(".optisnap_backups");
     
-    eprintln!("Backup directory: {}", backup_dir.display());
     
     fs::create_dir_all(&backup_dir)
         .map_err(|e| format!("Failed to create backup directory: {}", e))?;
     
-    eprintln!("Backup directory created successfully");
     
     // Create unique backup filename with timestamp
     let filename = original.file_name().ok_or("Invalid filename")?;
@@ -659,14 +674,11 @@ fn create_backup(file_path: String) -> Result<BackupInfo, String> {
     let backup_filename = format!("{}_{}", timestamp, filename.to_string_lossy());
     let backup_path = backup_dir.join(backup_filename);
     
-    eprintln!("Backup file path: {}", backup_path.display());
     
     // Copy file to backup location
     let bytes_copied = fs::copy(original, &backup_path)
         .map_err(|e| format!("Failed to create backup: {}", e))?;
     
-    eprintln!("Backup created successfully: {} bytes copied", bytes_copied);
-    eprintln!("=== CREATE BACKUP END ===");
     
     // Verify backup exists
     if !backup_path.exists() {
@@ -711,14 +723,29 @@ fn delete_backup(backup_path: String) -> Result<String, String> {
     Ok(format!("Deleted backup: {}", backup_path))
 }
 
+#[tauri::command]
+fn cancel_batch(cancel_flag: State<CancellationFlag>) -> Result<String, String> {
+    cancel_flag.0.store(true, Ordering::Relaxed);
+    Ok("Batch processing cancellation requested".to_string())
+}
+
+#[tauri::command]
+fn reset_cancel_flag(cancel_flag: State<CancellationFlag>) -> Result<String, String> {
+    cancel_flag.0.store(false, Ordering::Relaxed);
+    Ok("Cancel flag reset".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .manage(CancellationFlag(Arc::new(AtomicBool::new(false))))
         .invoke_handler(tauri::generate_handler![
             optimize_batch,
+            cancel_batch,
+            reset_cancel_flag,
             get_supported_formats,
             get_image_dimensions,
             scan_folder_for_images,

@@ -163,6 +163,13 @@ function App() {
       if (files.length === 0) return;
       if (!overwrite && !outputDir) return;
 
+      // Reset cancellation flag before starting
+      try {
+         await invoke('reset_cancel_flag');
+      } catch (error) {
+         console.error('Failed to reset cancel flag:', error);
+      }
+
       setIsProcessing(true);
       setProcessedFiles(0);
       setSuccessCount(0);
@@ -275,10 +282,13 @@ function App() {
       }
    };
 
-   const handleCancel = () => {
-      // Note: In a real app, you'd implement cancellation via Rust
-      // For now, we just stop the UI
-      setIsProcessing(false);
+   const handleCancel = async () => {
+      try {
+         await invoke('cancel_batch');
+         setIsProcessing(false);
+      } catch (error) {
+         console.error('Failed to cancel batch:', error);
+      }
    };
 
    const canStart =
